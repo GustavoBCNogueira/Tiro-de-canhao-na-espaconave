@@ -1,9 +1,9 @@
 .data
 
-.include "ship.data"
-.include "ship_background.data"
-.include "explosion.data"
-.include "explosion_background.data"
+.include "./Sprites/ship.data"
+.include "./Sprites/ship_background.data"
+.include "./Sprites/explosion.data"
+.include "./Sprites/explosion_background.data"
 
 POSICAO_NAVE: .word 0, 0
 POSICAO_NAVE_ANT: .word 0, 0
@@ -166,6 +166,8 @@ L4:	la s4, POSICAO_EXPLOSAO		# Carrega o endereço da posição da explosão
 #						#
 #	a0 = posição x atual			#
 #	a1 = posição y atual			#
+# 	a2 = passo de x				#
+# 	a3 = passo de y				#
 #################################################
 
 ERROU_BOLA:
@@ -175,7 +177,16 @@ ERROU_BOLA:
 	sw a0, 8(s1)			# Guarda o x atual na posição antiga da nave
 	sw a1, 12(s1)			# Guarda o y atual na posição antiga da nave
 	
-	li t0, 317			# t0 = 317
+	li t0, 50			# t0 = limite do x para não ter conflito com o canhão quando for renderizar
+	bgt a0, t0, BD 			# Se não tá em conflito no x, segue normal
+	li t0, 190			# t0 = limite do y para não ter conflito com o canhão quando for renderizar
+	ble a1, t0, BD			# Se não tá em conflito no y, segue normal
+	li a0, 51			# a0 = 51, coordenada x
+	li a1, 190			# a1 = 190, coordenada y
+	li a2, 6			# a2 = 6, muda o passo de x pra direita
+	li a3, -6			# a3 = -6, muda o passo de y pra cima
+	
+BD:	li t0, 317			# t0 = 317
 	bge a0, t0, BORDA_DIR		# Se a0 >= t0 => BORDA_DIR
 	
 BE:	ble a0, zero, BORDA_ESQ		# Se a0 <= 0 => BORDA_ESQ
