@@ -1,15 +1,13 @@
 .data
-#.include "Sprites/canon.data"
-PI: .float 3.1415
-ANGLE: .float 0.9250 #53
 V0: .word 300
-GRAVIDADE: .float 10.0
+GRAVIDADE: .float 9.8
 PONTACANHAO: .float 765.0
 TEMPO: .float 24.0
 PULA: .string "\n"
 MIN_ANGLE: .float 0.1
 MAX_ANGLE: .float 1.5
 DEGREES_STEP: .float 0.1
+VELOCITY_STEP: .float 1.0
 START_DEGREE: .float 0.1
 
 .text
@@ -18,9 +16,17 @@ SETUP:
     # fs1 = min angle
     # fs2 = max angle
     # fs3 = angulo selecionado
-    # fs4 = velocidade selecionada
+    # fs4 = angulo do ultimo tiro
+    # fs5 = tempo do tiro
+
     # s0 = tamanho canhão
     # s1 = largura canhão
+    # s3 = posx da bala
+    # s4 = posy da bala
+    # s5 = velocidade atual
+    # s6 = velocidade no momento do tiro
+    # s7 = x0 no momento do tiro
+    # s8 = y0 no momento do tiro
 
     la t0, START_DEGREE
     flw fs0, 0(t0)
@@ -33,9 +39,11 @@ SETUP:
 
     li s0, 15
     li s1, 60
+    li s3, -1
+    li s4, -1
 
     li a0, 1
-    li a1, 220
+    li a1, 229
     mv a2, s0
     mv a3, s1
     li a4, 0
@@ -43,44 +51,6 @@ SETUP:
     fmv.s fa0, fs0
 
     jal ra, DRAW_RECTANGLE
-    #fs0 = angulo 
-    #s0 = tamanho canhao
-    
-    #fmv.s fa0,fs0	#fa0 = angulo de argumento
-    #li a0,7		#a0 = precisao de argumento
-    
-    #jal ra, SIN
-    #fmv.s fa3,fa0	#fa3 = SIN
-    
-    #la a2, V0
-    #lw a2,0(a2)		#le velocidade default
-    
-    #jal ra,VELOCIDADE	#fa0 = velocidade escolhida 
-    #fmv.s fa2,fa0	#fa2 = velocidade selecionada p/ argumento
-    
-    #fa2 = V0 e fa3 = SIN
-    #jal ra,Vy0		#fa0 = Vy0
-    #fmv.s ft0,fa0
-    #===== ft0 = Vy0 calculado =========
-    
-    
-    #fmv.s fa0,fs0	#fa0 = angulo de argumento
-    #li a0,7		#a0 = precisao de argumento
-    
-    #jal ra, COS
-    #fmv.s fa3,fa0	#fa3 = cos
-    
-    #fa2 = V0 e fa3 = cos
-    #jal ra,Vx0		#fa0 = Vx0
-    #fmv.s ft1,fa0
-    #===== ft1 = Vx0 calculado =========
-    
-    
-    la t3,V0
-    lw t3,0(t3)		#t3 = Velocidade default
-    
-    
-    
 
 GAME_LOOP:
 
@@ -91,50 +61,88 @@ KEYPOLL:
 	beqz t2, END_KEYPOLL # Se não tem tecla, então continua o jogo
 	lw t1, 4(t0) # t1 = conteudo da tecla 
 	
-	
-	li t0,'t'
-	bne t0,t1,CONTINUE
-	fmv.s fs3,fs0		#fs3 = ANGULO ATUAL
-	fmv.s fs4,ft3		#fs4 = VELOCIDADE ATUAL
-	
-	li a7,1
-	mv a0,t3	#imprime a velocidade no instante atual
-	ecall
-	
-	li a7,4
-	la a0,PULA
-	ecall
-	
-	li a7,3
-	fmv.s fa0,fs3	#imprime o angulo no instante atual
-	ecall
-	
-	li a7,4
-	la a0,PULA
-	ecall
-	
 CONTINUE: 
-	li t0, 'w' 		#tecla de incrementar angulo
+	li t0, 'w' # tecla de incrementar angulo
 	beq t0, t1, SOBE_ANGULO
 	
-	li t0, 's' 		#tecla de decrementar angulo
+	li t0, 's' # tecla de decrementar angulo
 	beq t0,t1, DESCE_ANGULO
 	
-	li t0,'q'		#tecla de incrementar velocidade
-	beq t0,t1,SOBE_VELOCIDADE
+	li t0, 'q' # tecla de incrementar velocidade
+	beq t0, t1, SOBE_VELOCIDADE
 	
-	li t0,'a'		#tecla de decrementar velocidade
-	beq t0,t1,DESCE_VELOCIDADE
-	
+	li t0, 'a' # tecla de decrementar velocidade
+	beq t0, t1, DESCE_VELOCIDADE
+
+    li t0, ' '
+	beq t0, t1, TIRO
 
     j REDRAW_CANON
 
+TIRO:
+    fmv.s fs4, fs3
+    mv s6, s5
+
+    # Calcular cosseno
+    li a0, 7
+    fmv.s fa0, fs0
+    jal ra, COS
+
+    fcvt.s.w ft0, s1
+    fmul.s ft0, ft0, fa0 # ft0 = x0 = cos(ang) * tamanho
+    fcvt.w.s s7, ft0 # s7 é a ponta x do canhao
+    mv s3, s7
+
+    # Calcular seno
+    li a0, 7
+    fmv.s fa0, fs0
+    jal ra, SIN
+
+    fcvt.s.w ft0, s1
+    fmul.s ft0, ft0, fa0 # ft0 = y0 = sin(ang) * tamanho
+    fcvt.w.s s8, ft0
+    mv s4, s8
+
+    li a7, 30
+    ecall
+
+    fcvt.s.wu ft0, a0
+    li t0, 1000
+    fcvt.s.w ft1, t0
+    fdiv.s fs5, ft0, ft1 # tempo do tiro em segundos
+
+    j END_KEYPOLL
+
 SOBE_VELOCIDADE:
-	addi t3,t3,1		#incrementa a velocidade do disparo em t3
-	jal zero, KEYPOLL
+    li t0, 255
+    blt t0, s5, END_KEYPOLL
+
+    addi s5, s5, 1
+
+    li a7, 1
+    mv a0, s5
+    ecall
+
+    li a7, 11
+    li a0, '\n'
+    ecall
+
+    j END_KEYPOLL
+    
 DESCE_VELOCIDADE:
-	addi t3,t3,-1		#decrementa a velocidade do disparo em t3
-	jal zero, KEYPOLL
+    bge zero, s5, END_KEYPOLL
+
+    addi s5, s5, -1
+
+    li a7, 1
+    mv a0, s5
+    ecall
+
+    li a7, 11
+    li a0, '\n'
+    ecall
+    
+	j END_KEYPOLL
 
 SOBE_ANGULO:
     flt.s t0, fs2, fs0
@@ -143,7 +151,7 @@ SOBE_ANGULO:
     # ========= Remover canhão =========
 
     li a0, 1
-    li a1, 220
+    li a1, 229
     mv a2, s0
     mv a3, s1
     li a4, 0
@@ -167,7 +175,7 @@ DESCE_ANGULO:
     # ========= Remover canhão =========
 
     li a0, 1
-    li a1, 220
+    li a1, 229
     mv a2, s0
     mv a3, s1
     li a4, 0
@@ -186,7 +194,7 @@ REDRAW_CANON:
     # ========= Desenhar canhão =========
 
     li a0, 1
-    li a1, 220
+    li a1, 229
     mv a2, s0
     mv a3, s1
     li a4, 0
@@ -199,209 +207,194 @@ REDRAW_CANON:
 
 END_KEYPOLL:
 
-    j GAME_LOOP
+BULLET_MOVEMENT:
+    blt s3, zero, END_BULLET_MOVEMENT
+    li t0, 320
+    bge s3, t0, END_BULLET_MOVEMENT
+
+    blt s4, zero, END_BULLET_MOVEMENT
+    li t0, 240
+    bge s4, t0, END_BULLET_MOVEMENT
     
-#====================================================
-# a2 = velocidade default 
-# a0 = velocidade de retorno
-#=======Funcao p/ velocidade inicial ================
-VELOCIDADE:
-	addi sp,sp,-16
-	sw s0,0(sp)
-	sw t0,4(sp)
-	sw t1,8(sp)
-	sw t2,12(sp)
-	#guarda registradores 
-	    
-KEYPOLL_VELOCIDADE:
-	li a7,1			#imprime s0 em todos loop
-	mv a0,a2
-	ecall
-	
-	
-	li a7,4			#Pula linha no terminal
-	la a0,PULA
-	ecall
-	
+    li t0, 0xFF000000
 
-	li t0, 0xFF200000	# t0 = endere�o de controle do teclado
-	lw t1, 0(t0)		# t1 = conteudo de t0
-	andi t2, t1, 1		# Mascara o primeiro bit (verifica sem tem tecla)
-beqz t2, KEYPOLL_VELOCIDADE	# Se n�o tem tecla, ent�o espera por alguma
-	lw t1, 4(t0)		# t1 = conteudo da tecla 
-	
-	
-	li t0, ' '		#Tecla de confirmacao da velocidade
-	beq t1, t0,SAI_VELOCIDADE
-	
-	li t0,'q'		#tecla de incrementar velocidade
-	beq t0,t1, SOBEVELOCIDADE
-	
-	li t0,'a'		#tecla de decrementar velocidade
-	beq t0,t1, DESCEVELOCIDADE
-	
-	
-	bne t0,t1,KEYPOLL_VELOCIDADE	#se a tecla for nenhuma das especificas
-	
+    add t0, t0, s3
 
-SOBEVELOCIDADE:
-	addi a2,a2,1
-	jal zero, KEYPOLL_VELOCIDADE
+    li t1, 320
+    mul t1, s4, t1 # t0 = y * 320
+    add t0, t0, t1 # t0 = bitmap + y * 320
 
-DESCEVELOCIDADE:
-	addi a2,a2,-1
-	jal zero,KEYPOLL_VELOCIDADE
-	
-SAI_VELOCIDADE:
-	mv a0,a2		#resultado de retorno
-	
-	lw s0,0(sp)
-	lw t0,4(sp)
-	lw t1,8(sp)
-	lw t2,12(sp)
-	addi sp,sp,16
-	#recupera registradores utilizados
+    li t1, 0
+    sb t1, 0(t0)
+    sb t1, 1(t0)
+    sb t1, 2(t0)
+    sb t1, 3(t0)
+    sb t1, 4(t0)
 
-	ret		#retorna a main
-	
-	
-# =================================================
-# fa2 = Velocidade inicial
-# fa3 = cos 
-# fa0 = Vx0 retornada
-#=============== Vx0 ============================
-Vx0:
-	fmul.s fa0,fa2,fa3
-	ret
+    # fs4 = angulo do ultimo tiro
+    # fs5 = tempo do tiro
 
-#=====================================
-# fa2 = Velocidade inicial
-# fa3 = sin
-# fa0 = Vy0 retornada
-#================= Vy0 =========================
-Vy0:
-	fmul.s fa0,fa2,fa3
-	ret
-  
-# ===================================================
-#fa2 = Vy0 
-#fa3 = gravidade
-#fa4 = altura ponta canh�o
-#fa0 = tempo de retorno
-#============== tempo disparo======================
-tDisparo:
-	addi sp,sp,-28
-	sw t0,0(sp)
-	fsw fs0,4(sp)
-	fsw fs1,8(sp)
-	fsw fs2,12(sp)
-	fsw ft0,16(sp)
-	fsw ft1,20(sp)
-	fsw ft2,24(sp)
-	#guardou registradores
-	
-	
-	fdiv.s ft0, fa2,fa3 		#tempo subida
-	fmv.s fs1,ft0			#guarda tempo de subida
-	
-	fmul.s ft0,ft0,ft0		#t^2
-	fmul.s ft0,ft0,fa3		#g.t^2	
-	
-	
-	li t0,2				#t0 = 2
-	fcvt.s.w ft1,t0			#ft1 = 2.0
-	fdiv.s ft0,ft0,ft1		#ft0 =(g.t^2)/2
-	#distancia subida
-	
-	
-	fadd.s ft2,ft0,fa4		#distancia queda (Ds + fa4)
-	fmul.s fs2,ft2,ft1		#(2 * distancia queda)
-	fdiv.s fs2,fs2,fa3		#(2 * distancia queda)/g
-	fsqrt.s fs2,fs2			#tempo queda raiz((2*ft2)/g)
-	#tempo queda
-	
-	fadd.s fs0,fs1,fs2		#tempo total
-	
-	fmv.s fa0,fs0
-	
-	lw t0,0(sp)
-	flw fs0,4(sp)
-	flw fs1,8(sp)
-	flw fs2,12(sp)
-	flw ft0,16(sp)
-	flw ft1,20(sp)
-	flw ft2,24(sp)
-	addi sp,sp,28
-	
-	ret
+    # s3 = posx da bala
+    # s4 = posy da bala
+    # s6 = velocidade no momento do tiro
+    # s7 = x0 no momento do tiro
+    # s8 = y0 no momento do tiro
 
+    # Encontrar novos valores s3 e s4
 
-#================================================
-#fa2 = X0
-#fa3 = Vx0
-#fa4 = t
-#fa0 = x(t)
-#================== x(t)=========================
-posiX: 
-	addi sp,sp -4
-	fsw ft0,0(sp)
-	#registrador guardado
-	
-	fmul.s ft0, fa3,fa4
-	fadd.s ft0,ft0,fa2
-	
-	fmv.s fa0,ft0
-	
-	flw ft0,0(sp)
-	addi sp,sp,4
-	#recuperou registradores
+    # Calcular cosseno
+    li a0, 7
+    fmv.s fa0, fs4
+    jal ra, COS
+
+    fmv.s fa2, fa0
+
+    fcvt.s.w fa0, s7
+    fcvt.s.w fa1, s6
+
+    li a7, 30
+    ecall
+
+    fcvt.s.wu ft0, a0
+    li t0, 1000
+    fcvt.s.w ft1, t0
+    fdiv.s ft0, ft0, ft1
+
+    fsub.s fa3, ft0, fs5 # Tempo desde o primeiro frame
+    jal ra, BULLET_POS_X
+    fcvt.w.s s3, fa0
+
+    # fa0 = posicao y inicial
+    # fa1 = velocidade inicial
+    # fa2 = cosseno do angulo
+    # fa3 = tempo
+
+    # Calcular seno
+    li a0, 7
+    fmv.s fa0, fs4
+    jal ra, COS
+
+    fmv.s fa2, fa0
+
+    fcvt.s.w fa0, s8
+    fcvt.s.w fa1, s6
+
+    li a7, 30
+    ecall
+
+    fcvt.s.wu ft0, a0
+    li t0, 1000
+    fcvt.s.w ft1, t0
+    fdiv.s ft0, ft0, ft1
+
+    fsub.s fa3, ft0, fs5 # Tempo desde o primeiro frame
+    jal ra, BULLET_POS_Y
+    fcvt.w.s s4, fa0
+    li t0, 229
+    sub s4, t0, s4
+
+    # Fim
+
+    blt s3, zero, END_BULLET_MOVEMENT
+    li t0, 320
+    bge s3, t0, END_BULLET_MOVEMENT
+
+    blt s4, zero, END_BULLET_MOVEMENT
+    li t0, 240
+    bge s4, t0, END_BULLET_MOVEMENT
+
+    li t0, 0xFF000000
+
+    add t0, t0, s3
+
+    li t1, 320
+    mul t1, s4, t1 # t0 = y * 320
+    add t0, t0, t1 # t0 = bitmap + y * 320
+
+    li t1, 100
+    sb t1, 0(t0)
+    sb t1, 1(t0)
+    sb t1, 2(t0)
+    sb t1, 3(t0)
+    sb t1, 4(t0)
+
+    # Adiciona velocidade 
+    
+    # Pinta de amarelo
+END_BULLET_MOVEMENT:
+
+    li a7, 32
+    li a0, 10
+    ecall
+
+    j GAME_LOOP
+
+# ================== BULLET_POS_X ========================
+
+# x(t) = x0 + v0x * t
+
+# fa0 = posicao x inicial
+# fa1 = velocidade inicial
+# fa2 = cosseno do angulo
+# fa3 = tempo decorrido
+
+# Retorna a posicao x esperada da bala de acordo com o tempo
+
+BULLET_POS_X: 
+	addi sp, sp, -4
+	sw ra, 0(sp)
+
+    fmul.s ft0, fa1, fa2 # ft0 = Vx0 = V0 * cos(ang)
+	fmul.s ft0, ft0, fa3 # ft0 = Vx0 * tempo
+
+	fadd.s fa0, fa0, ft0 # ft0 = Vx0 * tempo + x0
+
+	lw ra, 0(sp)
+	addi sp, sp, 4
 	
 	ret
 
-#================================================
-#fa2 = Y0
-#fa3 = Vx0
-#fa4 = t
-#fa5 = g
-#fa1 = y(t)
-#================== y(t) ========================
-posiY: 
-	addi sp,sp,-16
-	sw t0,0(sp)
-	fsw fs0,4(sp)
-	fsw ft1,8(sp)
-	fsw fa6,12(sp)
-	#salvou registradores
+# ================================================
+
+# ================== BULLET_POS_Y ==================
+
+# y(t) = y0 + v0x * t - (g / 2) * tˆ2
+
+# fa0 = posicao y inicial
+# fa1 = velocidade inicial
+# fa2 = cosseno do angulo
+# fa3 = tempo
+
+# Retorna a posicao y esperada da bala de acordo com o tempo
+
+BULLET_POS_Y: 
+	addi sp, sp, -4
+	sw ra, 0(sp)
+
+    # Calcular v0x
+	fmul.s ft0, fa1, fa2 # ft0 = v0x = v0 * cos(ang)
+    fmul.s ft0, ft0, fa3 # ft0 = v0x * t
+    fadd.s ft0, ft0, fa0 # ft0 = (v0x * t) + y0
+
+    la t0, GRAVIDADE
+    flw ft1, 0(t0)
+
+    li t0, 2
+    fcvt.s.w ft2, t0
+    fdiv.s ft1, ft1, ft2 # ft1 = g / 2
+
+    fmul.s ft2, fa3, fa3 # ft2 = t^2
+
+    fmul.s ft1, ft1, ft2 # ft1 = (g/2) * t^2
+
+    fsub.s fa0, ft0, ft1 # ft0 = y0 + v0x * t - (g / 2) * tˆ2
 	
-	fmul.s ft0,fa3,fa4		# Vx0(t-t0)
-	#2�termo 
-	
-	
-	fmul.s ft1,fa4,fa4		#t^2
-	fmul.s ft1,ft1,fa5		#g(t^2)
-	
-	li t0,2				#t0 = 2
-	fcvt.s.w fa6,t0			#fa6 = 2.0
-	fdiv.s ft1,ft1,fa6		#ft1 = (g.t^2)/2
-	#3� termo
-	
-	
-	fadd.s fs0,fa2,ft0
-	fsub.s fs0,fs0,ft1
-	#fs0 = soma de todos termos
-	
-	
-	fmv.s fa1,fs0
-	
-	lw t0,0(sp)
-	flw fs0,4(sp)
-	flw ft1,8(sp)
-	flw fa6,12(sp)
-	addi sp,sp,16
+	lw ra, 0(sp)
+	addi sp, sp, 4
 	
 	ret
 
-
+# ==================================================
 
 # =================== Função FATORIAL ===================
 
@@ -625,13 +618,6 @@ PLACE_IN_BITMAP:
     jalr zero, ra, 0 # ret
 
 # =========================================================
-
-# ================== Função CANHAO_LOOP ==================
-
-# CANHAO_LOOP:
-    
-
-# ========================================================
 
 # ================== Função DRAW_RECTANGLE ==================
 
