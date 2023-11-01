@@ -1,5 +1,12 @@
 .data
+.include "sprites/canon.data"
 PI: .float 3.1415
+ANGLE: .float 0.9250 #53
+V0: .float 300.0
+GRAVIDADE: .float 10.0
+PONTACANHAO: .float 765.0
+TEMPO: .float 24.0
+PULA: .string "\n"
 MIN_ANGLE: .float 0.1
 MAX_ANGLE: .float 1.5
 DEGREES_STEP: .float 0.1
@@ -116,6 +123,208 @@ REDRAW_CANON:
 END_KEYPOLL:
 
     j GAME_LOOP
+    
+#====================================================
+# a2 = velocidade defalt 
+# a0 = velocidade de retornos
+#=======Funcao p/ velocidade inicial ================
+VELOCIDADE:
+	addi sp,sp,-16
+	sw s0,0(sp)
+	sw t0,4(sp)
+	sw t1,8(sp)
+	sw t2,12(sp)
+	#guarda registradores 
+	    
+KEYPOLL_VELOCIDADE:
+	li a7,1			#imprime s0 em todos loop
+	mv a0,a2
+	ecall
+	
+	
+	li a7,4			#Pula linha no terminal
+	la a0,PULA
+	ecall
+	
+
+	li t0, 0xFF200000	# t0 = endereço de controle do teclado
+	lw t1, 0(t0)		# t1 = conteudo de t0
+	andi t2, t1, 1		# Mascara o primeiro bit (verifica sem tem tecla)
+beqz t2, KEYPOLL_VELOCIDADE	# Se não tem tecla, então espera por alguma
+	lw t1, 4(t0)		# t1 = conteudo da tecla 
+	
+	
+	li t0, ' '		#Tecla de confirmacao da velocidade
+	beq t1, t0,SAI_VELOCIDADE
+	
+	li t0,'q'		#tecla de incrementar velocidade
+	beq t0,t1, SOBEVELOCIDADE
+	
+	li t0,'a'		#tecla de decrementar velocidade
+	beq t0,t1, DESCEVELOCIDADE
+	
+	
+	bne t0,t1,KEYPOLL_VELOCIDADE	#se a tecla for nenhuma das especificas
+	
+
+SOBEVELOCIDADE:
+	addi a2,a2,1
+	jal zero, KEYPOLL_VELOCIDADE
+
+DESCEVELOCIDADE:
+	addi a2,a2,-1
+	jal zero,KEYPOLL_VELOCIDADE
+	
+SAI_VELOCIDADE:
+	mv a0,a2		#resultado de retorno
+	
+	lw s0,0(sp)
+	lw t0,4(sp)
+	lw t1,8(sp)
+	lw t2,12(sp)
+	addi sp,sp,16
+	#recupera registradores utilizados
+
+	ret		#retorna a main
+	
+	
+# =================================================
+# fa2 = Velocidade inicial
+# fa3 = cos 
+# fa0 = Vx0 retornada
+#=============== Vx0 ============================
+Vx0:
+	fmul.s fa0,fa2,fa3
+	ret
+
+#=====================================
+# fa2 = Velocidade inicial
+# fa3 = sin
+# fa0 = Vy0 retornada
+#================= Vy0 =========================
+Vy0:
+	fmul.s fa0,fa2,fa3
+	ret
+  
+# ===================================================
+#fa2 = Vy0 
+#fa3 = gravidade
+#fa4 = altura ponta canhão
+#fa0 = tempo de retorno
+#============== tempo disparo======================
+tDisparo:
+	addi sp,sp,-28
+	sw t0,0(sp)
+	fsw fs0,4(sp)
+	fsw fs1,8(sp)
+	fsw fs2,12(sp)
+	fsw ft0,16(sp)
+	fsw ft1,20(sp)
+	fsw ft2,24(sp)
+	#guardou registradores
+	
+	
+	fdiv.s ft0, fa2,fa3 		#tempo subida
+	fmv.s fs1,ft0			#guarda tempo de subida
+	
+	fmul.s ft0,ft0,ft0		#t^2
+	fmul.s ft0,ft0,fa3		#g.t^2	
+	
+	
+	li t0,2				#t0 = 2
+	fcvt.s.w ft1,t0			#ft1 = 2.0
+	fdiv.s ft0,ft0,ft1		#ft0 =(g.t^2)/2
+	#distancia subida
+	
+	
+	fadd.s ft2,ft0,fa4		#distancia queda (Ds + fa4)
+	fmul.s fs2,ft2,ft1		#(2 * distancia queda)
+	fdiv.s fs2,fs2,fa3		#(2 * distancia queda)/g
+	fsqrt.s fs2,fs2			#tempo queda raiz((2*ft2)/g)
+	#tempo queda
+	
+	fadd.s fs0,fs1,fs2		#tempo total
+	
+	fmv.s fa0,fs0
+	
+	lw t0,0(sp)
+	flw fs0,4(sp)
+	flw fs1,8(sp)
+	flw fs2,12(sp)
+	flw ft0,16(sp)
+	flw ft1,20(sp)
+	flw ft2,24(sp)
+	addi sp,sp,28
+	
+	ret
+
+
+#================================================
+#fa2 = X0
+#fa3 = Vx0
+#fa4 = t
+#fa0 = x(t)
+#================== x(t)=========================
+posiX: 
+	addi sp,sp -4
+	fsw ft0,0(sp)
+	#registrador guardado
+	
+	fmul.s ft0, fa3,fa4
+	fadd.s ft0,ft0,fa2
+	
+	fmv.s fa0,ft0
+	
+	flw ft0,0(sp)
+	addi sp,sp,4
+	#recuperou registradores
+	
+	ret
+
+#================================================
+#fa2 = Y0
+#fa3 = Vx0
+#fa4 = t
+#fa5 = g
+#fa1 = y(t)
+#================== y(t) ========================
+posiY: 
+	addi sp,sp,-16
+	sw t0,0(sp)
+	fsw fs0,4(sp)
+	fsw ft1,8(sp)
+	fsw fa6,12(sp)
+	#salvou registradores
+	
+	fmul.s ft0,fa3,fa4		# Vx0(t-t0)
+	#2ºtermo 
+	
+	
+	fmul.s ft1,fa4,fa4		#t^2
+	fmul.s ft1,ft1,fa5		#g(t^2)
+	
+	li t0,2				#t0 = 2
+	fcvt.s.w fa6,t0			#fa6 = 2.0
+	fdiv.s ft1,ft1,fa6		#ft1 = (g.t^2)/2
+	#3º termo
+	
+	
+	fadd.s fs0,fa2,ft0
+	fsub.s fs0,fs0,ft1
+	#fs0 = soma de todos termos
+	
+	
+	fmv.s fa1,fs0
+	
+	lw t0,0(sp)
+	flw fs0,4(sp)
+	flw ft1,8(sp)
+	flw fa6,12(sp)
+	addi sp,sp,16
+	
+	ret
+
+
 
 # =================== FunÃ§Ã£o FATORIAL ===================
 
