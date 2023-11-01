@@ -1,8 +1,8 @@
 .data
-.include "sprites/canon.data"
+#.include "Sprites/canon.data"
 PI: .float 3.1415
 ANGLE: .float 0.9250 #53
-V0: .float 300.0
+V0: .word 300
 GRAVIDADE: .float 10.0
 PONTACANHAO: .float 765.0
 TEMPO: .float 24.0
@@ -17,6 +17,8 @@ SETUP:
     # fs0 = current angle
     # fs1 = min angle
     # fs2 = max angle
+    # fs3 = angulo selecionado
+    # fs4 = velocidade selecionada
     # s0 = tamanho canhão
     # s1 = largura canhão
 
@@ -41,6 +43,44 @@ SETUP:
     fmv.s fa0, fs0
 
     jal ra, DRAW_RECTANGLE
+    #fs0 = angulo 
+    #s0 = tamanho canhao
+    
+    #fmv.s fa0,fs0	#fa0 = angulo de argumento
+    #li a0,7		#a0 = precisao de argumento
+    
+    #jal ra, SIN
+    #fmv.s fa3,fa0	#fa3 = SIN
+    
+    #la a2, V0
+    #lw a2,0(a2)		#le velocidade default
+    
+    #jal ra,VELOCIDADE	#fa0 = velocidade escolhida 
+    #fmv.s fa2,fa0	#fa2 = velocidade selecionada p/ argumento
+    
+    #fa2 = V0 e fa3 = SIN
+    #jal ra,Vy0		#fa0 = Vy0
+    #fmv.s ft0,fa0
+    #===== ft0 = Vy0 calculado =========
+    
+    
+    #fmv.s fa0,fs0	#fa0 = angulo de argumento
+    #li a0,7		#a0 = precisao de argumento
+    
+    #jal ra, COS
+    #fmv.s fa3,fa0	#fa3 = cos
+    
+    #fa2 = V0 e fa3 = cos
+    #jal ra,Vx0		#fa0 = Vx0
+    #fmv.s ft1,fa0
+    #===== ft1 = Vx0 calculado =========
+    
+    
+    la t3,V0
+    lw t3,0(t3)		#t3 = Velocidade default
+    
+    
+    
 
 GAME_LOOP:
 
@@ -51,13 +91,50 @@ KEYPOLL:
 	beqz t2, END_KEYPOLL # Se não tem tecla, então continua o jogo
 	lw t1, 4(t0) # t1 = conteudo da tecla 
 	
-	li t0, 'w' # tecla de incrementar angulo
+	
+	li t0,'t'
+	bne t0,t1,CONTINUE
+	fmv.s fs3,fs0		#fs3 = ANGULO ATUAL
+	fmv.s fs4,ft3		#fs4 = VELOCIDADE ATUAL
+	
+	li a7,1
+	mv a0,t3	#imprime a velocidade no instante atual
+	ecall
+	
+	li a7,4
+	la a0,PULA
+	ecall
+	
+	li a7,3
+	fmv.s fa0,fs3	#imprime o angulo no instante atual
+	ecall
+	
+	li a7,4
+	la a0,PULA
+	ecall
+	
+CONTINUE: 
+	li t0, 'w' 		#tecla de incrementar angulo
 	beq t0, t1, SOBE_ANGULO
 	
-	li t0, 's' #tecla de decrementar angulo
+	li t0, 's' 		#tecla de decrementar angulo
 	beq t0,t1, DESCE_ANGULO
+	
+	li t0,'q'		#tecla de incrementar velocidade
+	beq t0,t1,SOBE_VELOCIDADE
+	
+	li t0,'a'		#tecla de decrementar velocidade
+	beq t0,t1,DESCE_VELOCIDADE
+	
 
     j REDRAW_CANON
+
+SOBE_VELOCIDADE:
+	addi t3,t3,1		#incrementa a velocidade do disparo em t3
+	jal zero, KEYPOLL
+DESCE_VELOCIDADE:
+	addi t3,t3,-1		#decrementa a velocidade do disparo em t3
+	jal zero, KEYPOLL
 
 SOBE_ANGULO:
     flt.s t0, fs2, fs0
@@ -125,8 +202,8 @@ END_KEYPOLL:
     j GAME_LOOP
     
 #====================================================
-# a2 = velocidade defalt 
-# a0 = velocidade de retornos
+# a2 = velocidade default 
+# a0 = velocidade de retorno
 #=======Funcao p/ velocidade inicial ================
 VELOCIDADE:
 	addi sp,sp,-16
