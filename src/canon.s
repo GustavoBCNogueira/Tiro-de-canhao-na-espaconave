@@ -55,11 +55,11 @@ SETUP:
 GAME_LOOP:
 
 KEYPOLL:
-	li t0, 0xFF200000 # t0 = endereço de controle do teclado
-	lw t1, 0(t0) # t1 = conteudo de t0
-	andi t2, t1, 1 # Mascara o primeiro bit (verifica sem tem tecla)
-	beqz t2, END_KEYPOLL # Se não tem tecla, então continua o jogo
-	lw t1, 4(t0) # t1 = conteudo da tecla 
+	li t0, 0xFF200000           # t0 = endereço de controle do teclado
+	lw t1, 0(t0)                # t1 = conteudo de t0
+	andi t2, t1, 1              # Mascara o primeiro bit (verifica sem tem tecla)
+	beqz t2, END_KEYPOLL        # Se não tem tecla, então continua o jogo
+	lw t1, 4(t0)                # t1 = conteudo da tecla 
 	
 CONTINUE: 
 	li t0, 'w' # tecla de incrementar angulo
@@ -80,36 +80,37 @@ CONTINUE:
     j REDRAW_CANON
 
 TIRO:
-    fmv.s fs4, fs3
-    mv s6, s5
-
+    fmv.s fs4, fs3		    #fs4 = angulo do tiro em execucao
+    mv s6, s5			    #s6 =  velocidade do tiro em execucao
+    
+ 
     # Calcular cosseno
     li a0, 7
     fmv.s fa0, fs0
     jal ra, COS
 
-    fcvt.s.w ft0, s1
-    fmul.s ft0, ft0, fa0 # ft0 = x0 = cos(ang) * tamanho
-    fcvt.w.s s7, ft0 # s7 é a ponta x do canhao
-    mv s3, s7
+    fcvt.s.w ft0, s1		#ft0 = s1 = comprimento do canhao
+    fmul.s ft0, ft0, fa0 	#ft0 = x0 = cos(ang) * tamanho
+    fcvt.w.s s7, ft0 		#s7 = x0 = ponta int(x) do canhao
+    mv s3, s7			    #s3 = x0 da bala no inicio do disparo
 
     # Calcular seno
     li a0, 7
     fmv.s fa0, fs0
     jal ra, SIN
 
-    fcvt.s.w ft0, s1
-    fmul.s ft0, ft0, fa0 # ft0 = y0 = sin(ang) * tamanho
-    fcvt.w.s s8, ft0
-    mv s4, s8
+    fcvt.s.w ft0, s1		#ft0 = float(s1) = float(sin(ang))
+    fmul.s ft0, ft0, fa0 	#ft0 = y0 = sin(ang) * tamanho
+    fcvt.w.s s8, ft0		#s8 = y0 = ponta int(y) do canhao
+    mv s4, s8			#s4 = y0 = y0 da bala no inicio do disparo
 
-    li a7, 30
+    li a7, 30			#pega tempo real atual em ms(s/1000)
     ecall
 
-    fcvt.s.wu ft0, a0
-    li t0, 1000
-    fcvt.s.w ft1, t0
-    fdiv.s fs5, ft0, ft1 # tempo do tiro em segundos
+    fcvt.s.wu ft0, a0		
+    li t0, 1000			
+    fcvt.s.w ft1, t0		
+    fdiv.s fs5, ft0, ft1 	# fs5 = tempo inicio do tiro em segundos
 
     j END_KEYPOLL
 
@@ -208,22 +209,29 @@ REDRAW_CANON:
 END_KEYPOLL:
 
 BULLET_MOVEMENT:
+
+	#se s3 = x(t) estiver fora da tela encerra a execucao do disparo
     blt s3, zero, END_BULLET_MOVEMENT
     li t0, 320
     bge s3, t0, END_BULLET_MOVEMENT
-
+    
+	#se s4 = y(t) estiver fora da tela encerra a execucao do disparo
     blt s4, zero, END_BULLET_MOVEMENT
     li t0, 240
     bge s4, t0, END_BULLET_MOVEMENT
     
-    li t0, 0xFF000000
+    
+    #renderiza a bala em (x(t),y(t))
+    li t0, 0xFF000000		#t0 = pixel superior esquerdo do bitmap
 
-    add t0, t0, s3
+    add t0, t0, s3		#t0 = define posicao X da bala na tela
 
-    li t1, 320
-    mul t1, s4, t1 # t0 = y * 320
-    add t0, t0, t1 # t0 = bitmap + y * 320
+    li t1, 320			#t1 = incrementador de posi Y 
+    mul t1, s4, t1 		#t0 = y * 320
+    add t0, t0, t1 		#t0 = bitmap + (y * 320)
+    # t0 = (x(t),y(t))
 
+	#apaga a posicao antiga da bala no instante anterior 
     li t1, 0
     sb t1, 0(t0)
     sb t1, 1(t0)
@@ -247,6 +255,7 @@ BULLET_MOVEMENT:
     fmv.s fa0, fs4
     jal ra, COS
 
+	#converte para float valores do disparo atual p/ prox cordenada
     fmv.s fa2, fa0
 
     fcvt.s.w fa0, s7
@@ -260,14 +269,14 @@ BULLET_MOVEMENT:
     fcvt.s.w ft1, t0
     fdiv.s ft0, ft0, ft1
 
-    fsub.s fa3, ft0, fs5 # Tempo desde o primeiro frame
-    jal ra, BULLET_POS_X
-    fcvt.w.s s3, fa0
+    fsub.s fa3, ft0, fs5 	# Tempo desde o primeiro frame
+    jal ra, BULLET_POS_X	#obtem x(t)
+    fcvt.w.s s3, fa0		#s3 = int(x(t))
 
     # fa0 = posicao y inicial
     # fa1 = velocidade inicial
     # fa2 = cosseno do angulo
-    # fa3 = tempo
+    # fa3 = tempo       ---------------------
 
     # Calcular seno
     li a0, 7
@@ -279,21 +288,11 @@ BULLET_MOVEMENT:
     fcvt.s.w fa0, s8
     fcvt.s.w fa1, s6
 
-    li a7, 30
-    ecall
-
-    fcvt.s.wu ft0, a0
-    li t0, 1000
-    fcvt.s.w ft1, t0
-    fdiv.s ft0, ft0, ft1
-
-    fsub.s fa3, ft0, fs5 # Tempo desde o primeiro frame
     jal ra, BULLET_POS_Y
-    fcvt.w.s s4, fa0
-    li t0, 229
-    sub s4, t0, s4
-
-    # Fim
+    fcvt.w.s s4, fa0		#s4 = y(t) atual
+    li t0, 229			#t0 = linha chao do bitmap (y mais baixo da tela acima do canhao deitado)
+    sub s4, t0, s4		#posiciona y considerando o calculo a partir do chao
+    # Fim dos calculos de posicao da bala no frame
 
     blt s3, zero, END_BULLET_MOVEMENT
     li t0, 320
@@ -308,10 +307,13 @@ BULLET_MOVEMENT:
     add t0, t0, s3
 
     li t1, 320
-    mul t1, s4, t1 # t0 = y * 320
-    add t0, t0, t1 # t0 = bitmap + y * 320
+    mul t1, s4, t1 	#t0 = y * 320
+    add t0, t0, t1 	#t0 = bitmap + y * 320
 
-    li t1, 100
+
+    li t1, 100		#cor da bala
+    
+    #pinta a bala em seus respectiveis pixels
     sb t1, 0(t0)
     sb t1, 1(t0)
     sb t1, 2(t0)
