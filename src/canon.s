@@ -9,8 +9,12 @@ MAX_ANGLE: .float 1.5
 DEGREES_STEP: .float 0.1
 VELOCITY_STEP: .float 1.0
 START_DEGREE: .float 0.1
+ANGLE: .string "ANGULO:"
+VELOCITY: .string "VELOCIDADE:"
+RADIANO: .float 57.2957
 
 .text
+.include "MACROSv21.s"
 SETUP:
     # fs0 = current angle
     # fs1 = min angle
@@ -51,9 +55,75 @@ SETUP:
     fmv.s fa0, fs0
 
     jal ra, DRAW_RECTANGLE
+    
+    
 
 GAME_LOOP:
+	#addi sp,sp, -32
+	#sw a0,0(sp)
+	#sw a1,4(sp)
+	#sw a2,8(sp)
+	#sw a3,12(sp)
+	#sw a4,16(sp)
+	#fsw fs4,20(sp)
+	#fsw ft0,24(sp)
+	#sw t0,28(sp)
+	
+	#titulo verde da velocidade
+	la a0,VELOCITY
+	li a1,0
+	li a2,1
+	li a3,50
+	li a4,0
+	li a7,104
+	ecall
+	
+	#texto branco do valor da velocidade
+	mv a0,s5
+	li a1,90
+	li a2,1
+	li a3,255
+	li a4,0
+	li a7,101
+	ecall
+	
+	#titulo verde do angulo
+	la a0,ANGLE
+	li a1,1
+	li a2,12
+	li a3,50
+	li a4,0
+	li a7,104
+	ecall
+	
 
+	#retira o angulo de radianos
+	la t0,RADIANO
+	flw ft0,0(t0)
+	fmul.s ft0,fs0,ft0
+	
+	#texto branco do angulo
+	#fcvt.w.s a0,ft0
+	fmv.s fa0,ft0
+	li a1,60
+	li a2,12
+	li a3,255
+	li a4,0
+	li a7,102
+	ecall
+	
+
+	#lw a0,0(sp)
+	#lw a1,4(sp)
+	#lw a2,8(sp)
+	#lw a3,12(sp)
+	#lw a4,16(sp)
+	#flw fs4,20(sp)
+	#flw ft0,24(sp)
+	#lw t0,28(sp)
+	#addi sp,sp,32
+
+	
 KEYPOLL:
 	li t0, 0xFF200000           # t0 = endereço de controle do teclado
 	lw t1, 0(t0)                # t1 = conteudo de t0
@@ -867,3 +937,6 @@ DRAW_LINE_LOOP_FIM:
     jalr zero, ra, 0
 
 # ====================================================
+
+.include "SYSTEMv21.s"
+
