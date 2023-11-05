@@ -1,20 +1,26 @@
 .data
+
+.include "./Sprites/ship.data"
+.include "./Sprites/ship_background.data"
+.include "./Sprites/explosion.data"
+.include "./Sprites/explosion_background.data" 
+
 V0: .word 300
 GRAVIDADE: .float 9.8
 PONTACANHAO: .float 765.0
 TEMPO: .float 24.0
-PULA: .string "\n"
+# PULA: .string "\n"
 MIN_ANGLE: .float 0.1
 MAX_ANGLE: .float 1.5
 DEGREES_STEP: .float 0.1
 VELOCITY_STEP: .float 1.0
 START_DEGREE: .float 0.1
-ANGLE: .string "ANGULO:"
-VELOCITY: .string "VELOCIDADE:"
-RADIANO: .float 57.2957
+SHIP_POS: .word 0, 0
+SHIP_OLD_POS: .word 0, 0
+EXPLOSION_POS: .word 0, 0
+SHIP_PACE: .word 0, 0
 
 .text
-.include "MACROSv21.s"
 SETUP:
     # fs0 = current angle
     # fs1 = min angle
@@ -44,7 +50,7 @@ SETUP:
     li s0, 15
     li s1, 60
     li s3, -1
-    li s4, -1
+    li s4, 1
 
     li a0, 1
     li a1, 229
@@ -55,81 +61,31 @@ SETUP:
     fmv.s fa0, fs0
 
     jal ra, DRAW_RECTANGLE
-    
-    
+
+    li a0, 157
+    li a1, 117
+    call RANDOM
+
+    la t0, SHIP_POS	# Carrega o endereço da posição da nave em t0
+	sw a0, 0(t0)		# Guarda o x gerado pelo random no endereço
+	sw a1, 4(t0)		# Guarda o y gerado pelo random no endereço
+	
+	la a0, ship		# Carrega o endereço da sprite da nave em a0
+	lw a1, 0(t0)		# Carrega o x em a1
+	lw a2, 4(t0)		# Carrega o y em a2
+	li a3, 0		# a3 = Frame
+	call PRINT		# Renderiza no frame 0
+	li a3, 1
+	call PRINT		# Renderiza no frame 1
 
 GAME_LOOP:
-	#addi sp,sp, -32
-	#sw a0,0(sp)
-	#sw a1,4(sp)
-	#sw a2,8(sp)
-	#sw a3,12(sp)
-	#sw a4,16(sp)
-	#fsw fs4,20(sp)
-	#fsw ft0,24(sp)
-	#sw t0,28(sp)
-	
-	#titulo verde da velocidade
-	la a0,VELOCITY
-	li a1,0
-	li a2,1
-	li a3,50
-	li a4,0
-	li a7,104
-	ecall
-	
-	#texto branco do valor da velocidade
-	mv a0,s5
-	li a1,90
-	li a2,1
-	li a3,255
-	li a4,0
-	li a7,101
-	ecall
-	
-	#titulo verde do angulo
-	la a0,ANGLE
-	li a1,1
-	li a2,12
-	li a3,50
-	li a4,0
-	li a7,104
-	ecall
-	
 
-	#retira o angulo de radianos
-	la t0,RADIANO
-	flw ft0,0(t0)
-	fmul.s ft0,fs0,ft0
-	
-	#texto branco do angulo
-	#fcvt.w.s a0,ft0
-	fmv.s fa0,ft0
-	li a1,60
-	li a2,12
-	li a3,255
-	li a4,0
-	li a7,102
-	ecall
-	
-
-	#lw a0,0(sp)
-	#lw a1,4(sp)
-	#lw a2,8(sp)
-	#lw a3,12(sp)
-	#lw a4,16(sp)
-	#flw fs4,20(sp)
-	#flw ft0,24(sp)
-	#lw t0,28(sp)
-	#addi sp,sp,32
-
-	
 KEYPOLL:
-	li t0, 0xFF200000           # t0 = endereço de controle do teclado
-	lw t1, 0(t0)                # t1 = conteudo de t0
-	andi t2, t1, 1              # Mascara o primeiro bit (verifica sem tem tecla)
-	beqz t2, END_KEYPOLL        # Se não tem tecla, então continua o jogo
-	lw t1, 4(t0)                # t1 = conteudo da tecla 
+	li t0, 0xFF200000 # t0 = endereço de controle do teclado
+	lw t1, 0(t0) # t1 = conteudo de t0
+	andi t2, t1, 1 # Mascara o primeiro bit (verifica sem tem tecla)
+	beqz t2, END_KEYPOLL # Se não tem tecla, então continua o jogo
+	lw t1, 4(t0) # t1 = conteudo da tecla 
 	
 CONTINUE: 
 	li t0, 'w' # tecla de incrementar angulo
@@ -150,37 +106,74 @@ CONTINUE:
     j REDRAW_CANON
 
 TIRO:
-    fmv.s fs4, fs3		    #fs4 = angulo do tiro em execucao
-    mv s6, s5			    #s6 =  velocidade do tiro em execucao
+    li t0, -1
+    beq s3, t0, C
+
+    li t0, 0xFF000000
+
+    add t0, t0, s3
+
+    li t1, 320
+    mul t1, s4, t1 # t0 = y * 320
+    add t0, t0, t1 # t0 = bitmap + y * 320
+
+    li t1, 0
+    sb t1, 0(t0)
+
+C:  li a7, 1
+    mv a0, s3
+    ecall    
     
- 
+    li a7, 11
+    li a0, ' '
+    ecall    
+    
+    li a7, 1
+    mv a0, s4
+    ecall    
+    
+    li a7, 11
+    li a0, '\n'
+    ecall
+
+    # li t0, 320
+    # bge s3, t0, MOVE_NAVE
+
+    # blt s4, zero, MOVE_NAVE
+
+    # li t0, 240
+    # bge s4, t0, MOVE_NAVE
+
+    fmv.s fs4, fs3
+    mv s6, s5
+
     # Calcular cosseno
     li a0, 7
     fmv.s fa0, fs0
     jal ra, COS
 
-    fcvt.s.w ft0, s1		#ft0 = s1 = comprimento do canhao
-    fmul.s ft0, ft0, fa0 	#ft0 = x0 = cos(ang) * tamanho
-    fcvt.w.s s7, ft0 		#s7 = x0 = ponta int(x) do canhao
-    mv s3, s7			    #s3 = x0 da bala no inicio do disparo
+    fcvt.s.w ft0, s1
+    fmul.s ft0, ft0, fa0 # ft0 = x0 = cos(ang) * tamanho
+    fcvt.w.s s7, ft0 # s7 é a ponta x do canhao
+    mv s3, s7
 
     # Calcular seno
     li a0, 7
     fmv.s fa0, fs0
     jal ra, SIN
 
-    fcvt.s.w ft0, s1		#ft0 = float(s1) = float(sin(ang))
-    fmul.s ft0, ft0, fa0 	#ft0 = y0 = sin(ang) * tamanho
-    fcvt.w.s s8, ft0		#s8 = y0 = ponta int(y) do canhao
-    mv s4, s8			#s4 = y0 = y0 da bala no inicio do disparo
+    fcvt.s.w ft0, s1
+    fmul.s ft0, ft0, fa0 # ft0 = y0 = sin(ang) * tamanho
+    fcvt.w.s s8, ft0
+    mv s4, s8
 
-    li a7, 30			#pega tempo real atual em ms(s/1000)
+    li a7, 30
     ecall
 
-    fcvt.s.wu ft0, a0		
-    li t0, 1000			
-    fcvt.s.w ft1, t0		
-    fdiv.s fs5, ft0, ft1 	# fs5 = tempo inicio do tiro em segundos
+    fcvt.s.wu ft0, a0
+    li t0, 1000
+    fcvt.s.w ft1, t0
+    fdiv.s fs5, ft0, ft1 # tempo do tiro em segundos
 
     j END_KEYPOLL
 
@@ -279,35 +272,27 @@ REDRAW_CANON:
 END_KEYPOLL:
 
 BULLET_MOVEMENT:
-
-	#se s3 = x(t) estiver fora da tela encerra a execucao do disparo
-    blt s3, zero, END_BULLET_MOVEMENT
     li t0, 320
     bge s3, t0, END_BULLET_MOVEMENT
-    
-	#se s4 = y(t) estiver fora da tela encerra a execucao do disparo
+
     blt s4, zero, END_BULLET_MOVEMENT
     li t0, 240
     bge s4, t0, END_BULLET_MOVEMENT
     
-    
-    #renderiza a bala em (x(t),y(t))
-    li t0, 0xFF000000		#t0 = pixel superior esquerdo do bitmap
+    li t0, 0xFF000000
 
-    add t0, t0, s3		#t0 = define posicao X da bala na tela
+    add t0, t0, s3
 
-    li t1, 320			#t1 = incrementador de posi Y 
-    mul t1, s4, t1 		#t0 = y * 320
-    add t0, t0, t1 		#t0 = bitmap + (y * 320)
-    # t0 = (x(t),y(t))
+    li t1, 320
+    mul t1, s4, t1 # t0 = y * 320
+    add t0, t0, t1 # t0 = bitmap + y * 320
 
-	#apaga a posicao antiga da bala no instante anterior 
     li t1, 0
     sb t1, 0(t0)
-    sb t1, 1(t0)
-    sb t1, 2(t0)
-    sb t1, 3(t0)
-    sb t1, 4(t0)
+    # sb t1, 1(t0)
+    # sb t1, 2(t0)
+    # sb t1, 3(t0)
+    # sb t1, 4(t0)
 
     # fs4 = angulo do ultimo tiro
     # fs5 = tempo do tiro
@@ -325,7 +310,6 @@ BULLET_MOVEMENT:
     fmv.s fa0, fs4
     jal ra, COS
 
-	#converte para float valores do disparo atual p/ prox cordenada
     fmv.s fa2, fa0
 
     fcvt.s.w fa0, s7
@@ -339,14 +323,14 @@ BULLET_MOVEMENT:
     fcvt.s.w ft1, t0
     fdiv.s ft0, ft0, ft1
 
-    fsub.s fa3, ft0, fs5 	# Tempo desde o primeiro frame
-    jal ra, BULLET_POS_X	#obtem x(t)
-    fcvt.w.s s3, fa0		#s3 = int(x(t))
+    fsub.s fa3, ft0, fs5 # Tempo desde o primeiro frame
+    jal ra, BULLET_POS_X
+    fcvt.w.s s3, fa0
 
     # fa0 = posicao y inicial
     # fa1 = velocidade inicial
     # fa2 = cosseno do angulo
-    # fa3 = tempo       ---------------------
+    # fa3 = tempo
 
     # Calcular seno
     li a0, 7
@@ -358,13 +342,83 @@ BULLET_MOVEMENT:
     fcvt.s.w fa0, s8
     fcvt.s.w fa1, s6
 
-    jal ra, BULLET_POS_Y
-    fcvt.w.s s4, fa0		#s4 = y(t) atual
-    li t0, 229			#t0 = linha chao do bitmap (y mais baixo da tela acima do canhao deitado)
-    sub s4, t0, s4		#posiciona y considerando o calculo a partir do chao
-    # Fim dos calculos de posicao da bala no frame
+    li a7, 30
+    ecall
 
-    blt s3, zero, END_BULLET_MOVEMENT
+    fcvt.s.wu ft0, a0
+    li t0, 1000
+    fcvt.s.w ft1, t0
+    fdiv.s ft0, ft0, ft1
+
+    fsub.s fa3, ft0, fs5 # Tempo desde o primeiro frame
+    jal ra, BULLET_POS_Y
+    fcvt.w.s s4, fa0
+    li t0, 229
+    sub s4, t0, s4
+
+    # Fim
+
+    la t0, SHIP_POS
+    lw t1, 0(t0)
+    lw t2, 4(t0)
+    addi t1, t1, 1
+    addi t2, t2, 1
+
+    # li a7, 1
+    # mv a0, s3
+    # ecall
+
+    # li a7, 11
+    # li a0, ' '
+    # ecall
+
+    # li a7, 1
+    # mv a0, s4
+    # ecall
+
+    # li a7, 11
+    # li a0, '\n'
+    # ecall
+
+    # li a7, 1
+    # mv a0, t1
+    # ecall
+
+    # li a7, 11
+    # li a0, ' '
+    # ecall
+
+    # li a7, 1
+    # mv a0, t2
+    # ecall
+
+    # li a7, 11
+    # li a0, '\n'
+    # ecall
+    
+    mv a0, s3
+    mv a1, s4
+    mv a2, t1
+    mv a3, t2
+    call VERIFY_COLLISION
+
+    # li a7, 1
+    # ecall
+    # mv t0, a0
+
+    # li a7, 11
+    # li a0, '\n'
+    # ecall
+    # mv a0, t0
+
+    beq a0, zero, JUMP
+
+    la t0, SHIP_POS
+    lw a0, 0(t0)
+    lw a1, 4(t0)
+    call ACERTOU_NAVE
+
+JUMP:
     li t0, 320
     bge s3, t0, END_BULLET_MOVEMENT
 
@@ -377,18 +431,15 @@ BULLET_MOVEMENT:
     add t0, t0, s3
 
     li t1, 320
-    mul t1, s4, t1 	#t0 = y * 320
-    add t0, t0, t1 	#t0 = bitmap + y * 320
+    mul t1, s4, t1 # t0 = y * 320
+    add t0, t0, t1 # t0 = bitmap + y * 320
 
-
-    li t1, 100		#cor da bala
-    
-    #pinta a bala em seus respectiveis pixels
+    li t1, 255
     sb t1, 0(t0)
-    sb t1, 1(t0)
-    sb t1, 2(t0)
-    sb t1, 3(t0)
-    sb t1, 4(t0)
+    # sb t1, 1(t0)
+    # sb t1, 2(t0)
+    # sb t1, 3(t0)
+    # sb t1, 4(t0)
 
     # Adiciona velocidade 
     
@@ -400,6 +451,60 @@ END_BULLET_MOVEMENT:
     ecall
 
     j GAME_LOOP
+
+
+MOVE_NAVE:
+    addi sp, sp, -20
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    sw a1, 8(sp)
+    sw a2, 12(sp)
+    sw a3, 16(sp)
+
+    li a7, 11
+    li a0, 'D'
+    ecall
+    
+    li a7, 11
+    li a0, '\n'
+    ecall
+
+    li a7, 1
+    mv a0, s3
+    ecall
+
+    li a7, 11
+    li a0, ' '
+    ecall
+
+    li a7, 1
+    mv a0, s4
+    ecall
+
+    li a7, 11
+    li a0, '\n'
+    ecall
+
+    la t0, SHIP_POS
+
+    lw a0, 0(t0)
+    lw a1, 4(t0)
+
+    la t0, SHIP_PACE
+
+    lw a2, 0(t0)
+    lw a3, 4(t0)
+
+    call ERROU_NAVE
+
+    lw ra, 0(sp)
+    lw a0, 4(sp)
+    lw a1, 8(sp)
+    lw a2, 12(sp)
+    lw a3, 16(sp)
+    addi sp, sp, 20
+
+    j END_BULLET_MOVEMENT
 
 # ================== BULLET_POS_X ========================
 
@@ -938,5 +1043,310 @@ DRAW_LINE_LOOP_FIM:
 
 # ====================================================
 
-.include "SYSTEMv21.s"
+#################################################
+#	Função para gerar uma 			#
+#	posição (x,y) aleatória			#
+#						#
+#	a0 = limite de x			#
+#	a1 = limite de y			#
+#################################################
 
+RANDOM:	addi sp, sp, -4				# Aloca espaço na pilha
+	sw ra, 0(sp)				# Guarda o endereço de retorno na pilha
+    
+	mv t0, a0				# Coloca o x recebido em t0
+	mv t1, a1				# Coloca o y recebido em t1
+	li a0, 1				# a0 = 1
+	mv a1, t0				# a1 = x recebido
+	li t4, 3				# t4 = 3 para verificar se é múltiplo
+
+LOOPX:	li a7, 42				# Chamada para gerar número random no intervalo
+	ecall
+
+    addi a0, a0, 160
+	
+	rem t0, a0, t4				# t0 = a0 % t4
+	bne t0, zero, LOOPX			# Se não é múltiplo de 3 volta pro loop
+	
+	mv t2, a0				# t2 = x random
+	
+	li a0, 1				# a0 = 1
+	mv a1, t1				# a1 = y recebido
+	
+LOOPY:	li a7, 42				# Chamada para gerar número random no intervalo
+	ecall
+
+    addi a0, a0, 120
+	
+	rem t0, a0, t4				# t0 = a0 % t4
+	bne t0, zero, LOOPY			# Se não é múltiplo de 3 volta pro loop
+	
+	mv t3, a0				# t3 = y random
+	
+	li t1, 50				# t1 = limite do x para não ter conflito com o canhão quando for renderizar
+	ble t2, t1, COND2 			# Se tá em conflito, verifica o y, se não tá, segue normal
+	j PULA					# Segue normal
+COND2:	li t1, 190				# Limite do y
+	bge t3, t1, LOOPX 			# Se não tá de acordo, faz denovo
+
+PULA:	mv a0, t2				# Coloca o x random gerado em a0
+	mv a1, t3				# Coloca o y random gerado em a1
+	lw ra, 0(sp)				# Recupera o valor do endereço de retorno
+	addi sp, sp, 4				# Desaloca espaço na pilha
+	ret					# Retorna
+
+
+#################################################
+#	a0 = endereço imagem			#
+#	a1 = x					#
+#	a2 = y					#
+#	a3 = frame (0 ou 1)			#
+#################################################
+#	t0 = endereco do bitmap display		#
+#	t1 = endereco da imagem			#
+#	t2 = contador de linha			#
+# 	t3 = contador de coluna			#
+#	t4 = largura				#
+#	t5 = altura				#
+#################################################
+
+PRINT:	li t0,0xFF0			# carrega 0xFF0 em t0
+	add t0,t0,a3			# adiciona o frame ao FF0 (se o frame for 1 vira FF1, se for 0 fica FF0)
+	slli t0,t0,20			# shift de 20 bits pra esquerda (0xFF0 vira 0xFF000000, 0xFF1 vira 0xFF100000)
+	
+	add t0,t0,a1			# adiciona x ao t0
+	
+	li t1,320			# t1 = 320
+	mul t1,t1,a2			# t1 = 320 * y
+	add t0,t0,t1			# adiciona t1 ao t0
+	
+	addi t1,a0,8			# t1 = a0 + 8
+	
+	mv t2,zero			# zera t2
+	mv t3,zero			# zera t3
+	
+	lw t4,0(a0)			# carrega a largura em t4
+	lw t5,4(a0)			# carrega a altura em t5
+		
+PRINT_LINHA:	
+	lb t6,0(t1)			# carrega em t6 uma word (4 pixeis) da imagem
+	sb t6,0(t0)			# imprime no bitmap a word (4 pixeis) da imagem
+	
+	addi t0,t0,1			# incrementa endereco do bitmap
+	addi t1,t1,1			# incrementa endereco da imagem
+	
+	addi t3,t3,1			# incrementa contador de coluna
+	blt t3,t4,PRINT_LINHA		# se contador da coluna < largura, continue imprimindo
+
+	addi t0,t0,320			# t0 += 320
+	sub t0,t0,t4			# t0 -= largura da imagem
+	
+	mv t3,zero			# zera t3 (contador de coluna)
+	addi t2,t2,1			# incrementa contador de linha
+	bgt t5,t2,PRINT_LINHA		# se altura > contador de linha, continue imprimindo
+	
+	ret				# retorna
+
+#################################################
+#	Caso a bola de canhão 			#
+#	acerte a nave				#
+#						#
+#	a0 = posição x atual			#
+#	a1 = posição y atual			#
+#################################################
+
+ACERTOU_NAVE:
+	addi sp, sp, -12		# Aloca 3 words na pilha
+	sw ra, 8(sp)			# Guarda o endereço de retorno na pilha
+	sw a1, 4(sp)			# Guarda o y na pilha
+	sw a0, 0(sp)			# Guarda o x na pilha
+	
+    la t0, SHIP_POS
+
+	la a0, ship_background		# Carrega o endereço do sprite para "tampar" a nave
+	lw a1, 0(t0)			# Carrega o x
+	lw a2, 4(t0)			# Carrega o y
+	li a3, 0			# Frame = 0
+	call PRINT			# "Tampa" a nave no frame 0
+	li a3, 1			# Frame = 1
+	call PRINT			# "Tampa" a nave no frame 1
+	
+    la t0, SHIP_POS
+
+	la a0, explosion		# Carrega o endereço do sprite da explosão
+	lw a1, 0(t0)			# Carrega o x
+	lw a2, 4(t0)			# Carrega o y
+	addi a1, a1, -9			# Move a animação 9 pixeis pra esquerda
+	addi a2, a2, -9			# Move a animação 9 pixeis pra cima
+	li t0, 302			# t0 = 302, limite da direita
+	ble a1, t0, L1			# Se a1 tá abaixo do limite => L1
+	addi t2, a1, 18			# t2 = a1 + 18
+	li t0, 319			# t0 = 319
+	sub t2, t0, t2			# t2 = t0 - t2
+	add a1, a1, t2			# Calcula quantos pixeis passou da borda de baixo
+L1:	bge a1, zero, L2		# Se a1 >= 0 => L2
+	mv a1, zero			# a1 = 0
+L2:	li t0, 222			# t0 = 222, limite de baixo
+	ble a2, t0, L3			# Se tá abaixo do limite => L3
+	addi t2, a2, 18			# t2 = a2 + 18
+	li t0, 239			# t0 = 239
+	sub t2, t0, t2			# t2 = t0 - t2
+	add a2, a2, t2			# Calcula quantos pixeis passou da borda de baixo
+L3:	bge a2, zero, L4		# Se a2 >= 0 => L4
+	mv a2, zero			# a2 = 0
+L4:	la t0, EXPLOSION_POS		# Carrega o endereço da posição da explosão
+	sw a1, 0(t0)			# Salva o x calculado
+	sw a2, 4(t0) 			# Salva o y calculado
+	li a3, 0			# Frame = 0
+	call PRINT			# Renderiza no frame 0
+	li a3, 1			# Frame = 1
+	call PRINT			# Renderiza no frame 1
+	
+	li a0,40			# Nota = 40
+	li a1,1500			# Duração = 1,5s
+	li a2,126			# Efeito sonoro = 126
+	li a3,127			# Volume = 127
+	li a7,33			# Syscall = 33
+	ecall				# Toca o som de explosão
+	    
+	li a0, 1000			# Tempo de timeout = 1s
+	li a7, 32			# Syscall = 32
+	ecall				# Chama o timeout
+	
+    la t0, EXPLOSION_POS
+
+	la a0, explosion_background		# Carrega o endereço da sprite que "tampa" a explosão
+	lw a1, 0(t0)			# Carrega o x da explosão
+	lw a2, 4(t0)			# Carrega o y da explosão
+	li a3, 0			# Frame = 0	
+	call PRINT			# Tampa a explosão no frame 0
+	li a3, 1			# Frame = 1
+	call PRINT			# Tampa a explosão no frame 1
+
+    li a0, 157
+    li a1, 117
+    call RANDOM
+
+    la t0, SHIP_POS	    # Carrega o endereço da posição da nave em t0
+	sw a0, 0(t0)		# Guarda o x gerado pelo random no endereço
+	sw a1, 4(t0)		# Guarda o y gerado pelo random no endereço
+	
+    la a0, ship		# Carrega o endereço da sprite da nave em a0
+	lw a1, 0(t0)		# Carrega o x em a1
+	lw a2, 4(t0)		# Carrega o y em a2
+	li a3, 0		# a3 = Frame
+	call PRINT		# Renderiza no frame 0
+	li a3, 1
+	call PRINT		# Renderiza no frame 1
+
+	lw a0, 0(sp)			# Recupera o x
+	lw a1, 4(sp)			# Recupera o y
+	lw ra, 8(sp)			# Recupera o ra
+	addi sp, sp, 12			# Libera espaço na pilha
+	ret				# Retorna
+	
+			
+#################################################
+#	Caso a bola de canhão 			#
+#	não acertar a nave			#
+#						#
+#	a0 = posição x atual			#
+#	a1 = posição y atual			#
+# 	a2 = passo de x				#
+# 	a3 = passo de y				#
+#################################################
+
+ERROU_NAVE:
+	addi sp, sp, -4			# Aloca espaço na pilha
+	sw ra, 0(sp)			# Guarda o endereço de retorno na pilha
+	
+    la t0, SHIP_OLD_POS
+
+	sw a0, 0(t0)			# Guarda o x atual na posição antiga da nave
+	sw a1, 4(t0)			# Guarda o y atual na posição antiga da nave
+	
+BD:	li t0, 317			# t0 = 317
+	bge a0, t0, BORDA_DIR		# Se a0 >= t0 => BORDA_DIR
+	
+BE:	li t0, 160 
+    ble a0, t0, BORDA_ESQ		# Se a0 <= 0 => BORDA_ESQ
+	
+BB:	li t0, 237			# t0 = 237
+	bge a1, t0, BORDA_BAIXO		# Se a1 >= t0 => BORDA_BAIXO
+	
+BC:	ble a1, zero, BORDA_CIMA	# Se a1 <= 0 => BORDA_CIMA
+	 
+RET:	add a0, a0, a2			# x = x + passo de x
+	add a1, a1, a3			# y = y + passo de y
+	
+	li t0, 317			# t0 = 317
+	ble a0, t0, J1			# Se a0 <= t0 => J1
+	mv a0, t0			# a0 = 317
+J1:	li t0, 160
+    bge a0, t0, J2		# Se a0 >= 0 => J2
+ 	mv a0, zero			# a0 = 0
+J2:	li t0, 237			# t0 = 237
+	ble a1, t0, J3			# Se a1 <= t0 => J3
+	mv a1, t0			# a1 = 237
+J3:	bge a1, zero, J4		# Se a1 >= 0 => J4
+	mv a1, zero			# a1 = 0
+
+J4:	la t0, SHIP_POS
+    sw a0, 0(t0)			# Guarda a posição atualizada do x da nave
+	sw a1, 4(t0)			# Guarda a posição atualizada do y da nave
+	
+    la t0, SHIP_PACE
+    sw a2, 0(t0)			# Guarda o passo de x novo
+	sw a3, 4(t0)			# Guarda o passo de y novo
+	
+	lw ra, 0(sp)			# Recupera o valor do endereço de retorno
+	addi sp, sp, 4			# Desaloca espaço na pilha
+	ret				# Retorna
+	
+BORDA_DIR:
+	li a2, -6			# Passo de x = -6
+	j BE 				# Retorna para a função
+
+BORDA_ESQ:
+	li a2, 6			# Passo de x = 6
+	j BB				# Retorna para a função
+	
+BORDA_BAIXO:
+	li a3, -6			# Passo de y = -6
+	j BC				# Retorna para a função
+BORDA_CIMA:
+	li a3, 6			# Passo de y = 6
+	j RET				# Retorna para a função
+
+# =================== Função VERIFY_COLLISION ===================#
+
+# Calcula a distância entre a bala e a nave e verifica se há colisão ou não
+
+# d = ((x2-x1)^2 + (y2-y1)^2)^(1/2)
+
+# a0 = x da bala
+# a1 = y da bala
+# a2 = x da nave
+# a3 = y da nave
+
+VERIFY_COLLISION:
+
+    sub t0, a2, a0  
+    mul t0, t0, t0  
+
+    sub t1, a3, a1  
+    mul t1, t1, t1  
+
+    add t0, t0, t1  
+
+    # li a7, 1
+    # mv a0, t0
+    # ecall
+
+    # li a7, 11
+    # li a0, '\n'
+    # ecall
+
+    slti a0, t0, 100    # Se a distância for menor ou igual a 3, há colisão
+
+    ret
